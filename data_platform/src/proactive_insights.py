@@ -390,7 +390,10 @@ def main() -> None:
         spark.sql(f"COMMENT ON TABLE {name} IS '{meta['comment'].replace(chr(39), chr(92) + chr(39))}'")
         for c, comment in meta["columns"].items():
             spark.sql(f"ALTER TABLE {name} ALTER COLUMN {c} COMMENT '{comment.replace(chr(39), chr(92) + chr(39))}'")
-        spark.sql(f"ALTER TABLE {name} SET TAGS ('demo' = 'seqwater-ai-demo', 'data_classification' = 'synthetic')")
+        try:  # tags are best-effort: workspaces with governed tag policies may reject these keys or values
+            spark.sql(f"ALTER TABLE {name} SET TAGS ('demo' = 'seqwater-ai-demo', 'data_classification' = 'synthetic')")
+        except Exception as e:
+            print(f"  {name}: tags skipped ({str(e).splitlines()[0][:120]})")
     for r in spark.sql("SELECT rank, severity, domain, headline FROM proactive_insights ORDER BY rank").collect():
         print(f"  {r.rank:>2} {r.severity:8s} {r.domain:15s} {r.headline}")
 

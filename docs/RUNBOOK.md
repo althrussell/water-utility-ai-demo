@@ -271,6 +271,9 @@ Which of those matters most to you this summer?"
 | Skill not found in Genie One | Skills install for the user who ran `install`. Present as that user, or copy `.build/skills/` to your own `/Users/<you>/.assistant/skills/` |
 | MLflow traces list but won't open ("failed to download trace data") | The app couldn't upload trace payloads to workspace storage, usually because of serverless/app egress restrictions. Allow it in the workspace network policy, or skip traces in Act 6 |
 | The twin shows "Couldn't load the twin" | The reservoir tables are missing: run `./seqwater-demo refresh`. Then check the browser supports WebGL (any recent Chrome, Edge or Safari) |
+| Install says "No 'main' catalog ... using the workspace default catalog" | Expected on FEVM and newer workspaces. The demo goes into the default catalog; pass `--catalog <name>` to choose another |
+| Job log shows "tags skipped" | The workspace has governed tag policies that reject the demo's tags. Harmless: tags are optional |
+| Profile host ends in `/login.html` (or another path) | Handled: the installer deploys the agent with the bare host and an OAuth token. Tidier still: set `host = https://<workspace>` in `~/.databrickscfg` |
 | Want a clean slate | `./seqwater-demo reset` (actions only), or `uninstall` then `install` |
 
 ---

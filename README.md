@@ -13,7 +13,7 @@ A self-contained executive demo of the **Databricks Data Intelligence Platform**
 
 All data is **synthetic**. It uses real Seqwater asset names (Wivenhoe, Baroon Pocket, Mount Crosby, Landers Shute, Gold Coast Desalination Plant and others) with plausible magnitudes, and stays current: it regenerates to "yesterday" every morning at 5:15am Brisbane time.
 
-> Tested on **Databricks on AWS**. It should work on Azure Databricks wherever the same features are enabled, but Azure has not been tested.
+> Tested on **Databricks on AWS**, including a clean install on a fresh FEVM serverless workspace. It should work on Azure Databricks wherever the same features are enabled, but Azure has not been tested.
 
 ## Quick start
 
@@ -33,7 +33,7 @@ On Windows, use `python cli\seqwater_demo.py install --profile seqwater-demo`.
 |---|---|
 | Databricks CLI **v0.292+** (v1.x recommended), authenticated with a profile (OAuth) | Deploys bundles, apps, skills; runs SQL |
 | Python **3.10+** and **[uv](https://docs.astral.sh/uv/)** | Runs the installer, and `uvx` fetches the Agent Bricks CLI (`databricks-agentbricks==0.5.0`) |
-| A Unity Catalog **catalog** where you can create a schema (default `main`) | The demo schema `seqwater_demo` is created there |
+| A Unity Catalog **catalog** where you can create a schema (default `main`; if there's no `main`, the workspace default catalog is used) | The demo schema `seqwater_demo` is created there |
 | A **serverless SQL warehouse** (picked automatically) | Genie, metric views, the agent's SQL tools |
 | **Serverless jobs**, **Genie One**, **Databricks Apps**, **Agent Bricks custom agents (Beta)** enabled | The experience layers |
 | A foundation model endpoint that supports `ai_query` (default `databricks-claude-sonnet-4-6`; falls back to Sonnet 4.5, then Llama 3.3) and the AI Gateway model `system.ai.claude-sonnet-4-6` for the agent | Insight narratives, the briefing, the agent |

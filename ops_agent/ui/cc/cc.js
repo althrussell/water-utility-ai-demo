@@ -98,7 +98,8 @@ function renderMd(text) {
   for (const [e, sev] of Object.entries(EMOJI)) {
     html = html.split(e).join(`<span class="sev sev-${sev.toLowerCase()}">${sev}</span>`);
   }
-  return html.replace(/[✅⚠️⏸]/g, "");
+  // any other emoji the model adds (e.g. 🚨, ✅) is dropped: the UI uses badges and icons, not emoji
+  return html.replace(/\p{Extended_Pictographic}\uFE0F?/gu, "");
 }
 
 // ------------------------------------------------------------------ overview

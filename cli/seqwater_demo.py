@@ -21,6 +21,7 @@ import shutil
 import subprocess
 import sys
 import time
+import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path
@@ -67,8 +68,8 @@ def die(msg: str) -> None:
 
 # ------------------------------------------------------------------ command runners
 def run(cmd: list[str], *, cwd: Path | None = None, capture: bool = True, check: bool = True,
-        env: dict | None = None) -> subprocess.CompletedProcess:
-    e = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+        env: dict | None = None, drop: tuple = ()) -> subprocess.CompletedProcess:
+    e = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV" and k not in drop}
     if env:
         e.update(env)
     p = subprocess.run(cmd, cwd=cwd, capture_output=capture, text=True, env=e)
@@ -100,6 +101,21 @@ def agentbricks_cmd() -> list[str]:
     die("The Agent Bricks CLI is not installed. Install uv (https://docs.astral.sh/uv/) or run: "
         f"pip install databricks-agentbricks=={AGENTBRICKS_VERSION}")
     return []
+
+
+def agentbricks_auth(profile: str, host: str, host_has_path: bool) -> tuple[list[str], dict | None]:
+    """CLI args and env for agentbricks. The Python SDK behind it keeps any path on a profile host
+    (e.g. .../login.html) and builds broken URLs, so in that case authenticate with the bare host and
+    a fresh OAuth token from the Databricks CLI instead of the profile."""
+    if not host_has_path:
+        return ["-p", profile], None
+    tok = run(["databricks", "auth", "token", "--profile", profile, "-o", "json"], check=False)
+    try:
+        token = json.loads(tok.stdout)["access_token"]
+    except Exception:
+        die(f"Profile '{profile}' has a host with a path ({host}/...). Fix the host in ~/.databrickscfg "
+            f"to just {host}, or re-run: databricks auth login --host {host} --profile {profile}")
+    return [], {"DATABRICKS_HOST": host, "DATABRICKS_TOKEN": token, "DATABRICKS_AUTH_TYPE": "pat"}
 
 
 def sql(profile: str, warehouse_id: str, statement: str, *, check: bool = True) -> list[list]:
@@ -146,14 +162,26 @@ def preflight(profile: str) -> dict:
     if not isinstance(me, dict) or "userName" not in me:
         die(f"Profile '{profile}' is not authenticated. Run: databricks auth login --profile {profile}")
     host = run(["databricks", "auth", "describe", "--profile", profile, "-o", "json"], check=False).stdout
+    raw_host = ""
     try:
-        host = json.loads(host)["details"]["host"]
+        raw_host = json.loads(host)["details"]["host"]
+        u = urllib.parse.urlparse(raw_host)  # profiles sometimes carry a path, e.g. .../login.html
+        host = f"{u.scheme}://{u.netloc}" if u.netloc else raw_host
     except Exception:
         host = ""
     ok(f"Signed in as {me['userName']} {DIM}{host}{RESET}")
     if sys.version_info < (3, 10):
         die("Python 3.10+ is required.")
-    return {"user": me["userName"], "host": host.rstrip("/")}
+    # the Databricks CLI reports a cleaned host; the Python SDK reads the raw value from the config file
+    try:
+        import configparser
+        cfgp = configparser.ConfigParser()
+        cfgp.read(os.environ.get("DATABRICKS_CONFIG_FILE", str(Path.home() / ".databrickscfg")))
+        raw_host = cfgp.get(profile, "host", fallback=raw_host) or raw_host
+    except Exception:
+        pass
+    path = urllib.parse.urlparse(raw_host).path if raw_host else ""
+    return {"user": me["userName"], "host": host.rstrip("/"), "host_has_path": path not in ("", "/")}
 
 
 def pick_warehouse(profile: str, requested: str | None) -> str:
@@ -168,6 +196,23 @@ def pick_warehouse(profile: str, requested: str | None) -> str:
     w = ranked[0]
     ok(f"SQL warehouse: {w['name']} ({w['id']}){'' if w.get('enable_serverless_compute') else ' - not serverless'}")
     return w["id"]
+
+
+def workspace_default_catalog(profile: str, warehouse_id: str) -> str | None:
+    """The workspace's default Unity Catalog catalog: metastore setting first, then the namespace setting, then SQL."""
+    candidates = []
+    ms = dbx(profile, "metastores", "current", check=False)
+    if isinstance(ms, dict):
+        candidates.append(ms.get("default_catalog_name"))
+    ns = dbx(profile, "settings", "default-namespace", "get", check=False)
+    if isinstance(ns, dict):
+        candidates.append((ns.get("namespace") or {}).get("value"))
+    rows = sql(profile, warehouse_id, "SELECT current_catalog()", check=False)
+    candidates.append(rows[0][0] if rows and rows[0] else None)
+    for c in candidates:
+        if c and c not in ("hive_metastore", "spark_catalog") and isinstance(dbx(profile, "catalogs", "get", c, check=False), dict):
+            return c
+    return None
 
 
 # ------------------------------------------------------------------ steps
@@ -256,11 +301,13 @@ def render_agent(cfg: dict, profile: str, space_id: str) -> Path:
     return dest
 
 
-def deploy_agent(profile: str, cfg: dict, space_id: str) -> dict:
+def deploy_agent(profile: str, cfg: dict, space_id: str, host: str = "", host_has_path: bool = False) -> dict:
     src = render_agent(cfg, profile, space_id)
     ab = agentbricks_cmd()
     info("Deploying the Seqwater Operations Agent to Databricks Apps (about 3-6 minutes)...")
-    p = run([*ab, "-p", profile, "deploy", cfg["app_name"], "--source", str(src)], check=False)
+    auth_args, env = agentbricks_auth(profile, host, host_has_path)
+    p = run([*ab, *auth_args, "deploy", cfg["app_name"], "--source", str(src)], check=False, env=env,
+            drop=("DATABRICKS_CONFIG_PROFILE",) if env else ())
     if p.returncode != 0:
         die("Agent deploy failed:\n" + ((p.stderr or "") + (p.stdout or ""))[-2500:])
     name = cfg["app_name"].removeprefix("agent-bricks-")
@@ -319,9 +366,16 @@ def cmd_install(a) -> None:
     prev = load_state(a.profile)
     cfg = {k: getattr(a, k) or prev.get(k) or DEFAULTS.get(k) for k in ("catalog", "schema", "app_name", "llm_endpoint", "agent_model")}
     cfg["schedule"] = "PAUSED" if a.no_schedule else "UNPAUSED"
-    if not isinstance(dbx(a.profile, "catalogs", "get", cfg["catalog"], check=False), dict):
-        die(f"Catalog '{cfg['catalog']}' not found or not accessible. Pass --catalog <one you can create schemas in>.")
     cfg["warehouse_id"] = pick_warehouse(a.profile, a.warehouse_id or prev.get("warehouse_id"))
+    if not isinstance(dbx(a.profile, "catalogs", "get", cfg["catalog"], check=False), dict):
+        if a.catalog:
+            die(f"Catalog '{cfg['catalog']}' not found or not accessible. Pass --catalog <one you can create schemas in>.")
+        # no `main` here: fall back to the workspace's default catalog (FEVM and many newer workspaces)
+        default = workspace_default_catalog(a.profile, cfg["warehouse_id"])
+        if not default:
+            die(f"Catalog '{cfg['catalog']}' not found and the workspace has no default Unity Catalog catalog. Pass --catalog <name>.")
+        info(f"No '{cfg['catalog']}' catalog in this workspace; using the workspace default catalog '{default}'")
+        cfg["catalog"] = default
     ok(f"Target schema: {cfg['catalog']}.{cfg['schema']}")
     if not a.skip_agent:
         agentbricks_cmd()
@@ -345,7 +399,7 @@ def cmd_install(a) -> None:
     if a.skip_agent:
         info("skipped (--skip-agent)")
     else:
-        st.update(deploy_agent(a.profile, cfg, st["genie_space_id"]))
+        st.update(deploy_agent(a.profile, cfg, st["genie_space_id"], who["host"], who.get("host_has_path", False)))
         save_state(a.profile, st)
         warm_up_agent(a.profile, st["app_url"])
     save_state(a.profile, st)
@@ -412,7 +466,9 @@ def cmd_uninstall(a) -> None:
         if input("Type 'yes' to continue: ").strip().lower() != "yes":
             die("Cancelled.")
     if st.get("agent_app"):
-        run([*agentbricks_cmd(), "-p", a.profile, "deployments", "delete", st["agent_app"]], check=False)
+        auth_args, env = agentbricks_auth(a.profile, st.get("host", ""), st.get("host_has_path", False))
+        run([*agentbricks_cmd(), *auth_args, "deployments", "delete", st["agent_app"]], check=False, env=env,
+            drop=("DATABRICKS_CONFIG_PROFILE",) if env else ())
         ok(f"Deleted app {st['agent_app']}")
     v_exp = bundle_vars(st, "catalog", "schema", "warehouse_id")
     run([sys.executable, str(EXP / "build_space.py"), "--catalog", st["catalog"], "--schema", st["schema"]])

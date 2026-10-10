@@ -367,7 +367,10 @@ def create_all(spark, catalog: str, schema: str) -> None:
         except Exception as e:  # older runtimes do not support semantic metadata
             print(f"  {name}: retrying without synonyms ({str(e).splitlines()[0][:160]})")
             spark.sql(re.sub(r"\n\s*synonyms: \[.*?\]", "", stmt))
-        spark.sql(f"ALTER VIEW {fq}.{name} SET TAGS ('demo' = 'seqwater-ai-demo', 'certified' = 'true')")
+        try:  # tags are best-effort: workspaces with governed tag policies may reject these keys or values
+            spark.sql(f"ALTER VIEW {fq}.{name} SET TAGS ('demo' = 'seqwater-ai-demo', 'certified' = 'true')")
+        except Exception as e:
+            print(f"  {name}: tags skipped ({str(e).splitlines()[0][:120]})")
         print(f"  created metric view {name}")
 
 
