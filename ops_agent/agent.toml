@@ -1,0 +1,21 @@
+schema_version = 1
+
+[agent]
+framework = "langgraph"
+server = "agentbricks"
+
+[memory_store]
+name = "seqwater-ops-agent-memory"
+
+[session_store]
+name = "seqwater-ops-agent-sessions"
+
+[tracing]
+experiment_name = "/Shared/agentbricks_traces/seqwater-ops-agent"
+
+# The Seqwater Operations Intelligence Genie space as native agent tools (genie_agent_ask/poll/query_result).
+# The repo CLI writes the real space id into the .build/ copy. auth = "app" keeps human approvals working.
+[[tools]]
+id = "genie_agent"
+auth = "app"
+source = {kind = "genie_agent", space_id = "00000000000000000000000000000000"}

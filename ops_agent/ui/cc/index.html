@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en-AU">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Seqwater Ops Command Centre</title>
+    <link rel="icon" href="data:," />
+    <link rel="preload" href="/cc-assets/fonts/dm-sans-regular.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="/cc-assets/fonts/dm-sans-bold.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/cc-assets/cc.css?v=12" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <h1 class="product"><b>Seqwater</b> Ops Command Centre</h1>
+        <p class="provenance" id="asof">Loading the latest data</p>
+      </div>
+      <nav class="views" aria-label="Views">
+        <button class="view" type="button" data-view="centre" aria-current="page">Command Centre</button>
+        <button class="view" type="button" data-view="twin">Baroon Pocket twin</button>
+      </nav>
+      <div class="topbar-right">
+        <span class="tag" title="Every number in this demo is generated">Synthetic demo data</span>
+        <span class="viewer" id="viewer"></span>
+        <a class="link-quiet" href="/workbench" title="Agent Bricks developer workbench: sessions, memory, traces">Workbench</a>
+        <span class="built">Built on Databricks</span>
+      </div>
+    </header>
+
+    <section class="status" id="status" aria-label="Water Grid status"></section>
+
+    <main class="shell">
+      <section class="pane pane-insights" aria-labelledby="insights-title">
+        <div class="pane-head">
+          <div>
+            <h2 id="insights-title">Today's insights</h2>
+            <p class="meta" id="insights-meta">Raised automatically at 5:15am</p>
+          </div>
+          <button class="btn btn-secondary" id="open-brief" type="button">
+            <svg class="icon" aria-hidden="true"><use href="#i-file"></use></svg>Read the briefing
+          </button>
+        </div>
+        <div class="tabs" role="tablist" aria-label="Insights and actions">
+          <button class="tab" role="tab" id="tab-insights" aria-selected="true" aria-controls="insights-panel" type="button">Insights <span class="count" id="insights-count"></span></button>
+          <button class="tab" role="tab" id="tab-actions" aria-selected="false" aria-controls="actions-panel" type="button">Actions taken <span class="count" id="actions-count"></span></button>
+        </div>
+        <div class="pane-body" id="insights-panel" role="tabpanel" aria-labelledby="tab-insights">
+          <div class="segmented" id="severity-filter" role="radiogroup" aria-label="Filter by severity"></div>
+          <div id="insights"></div>
+        </div>
+        <div class="pane-body" id="actions-panel" role="tabpanel" aria-labelledby="tab-actions" hidden>
+          <div id="actions"></div>
+        </div>
+      </section>
+
+      <section class="pane pane-twin" id="pane-twin" aria-labelledby="twin-title" hidden>
+        <div class="pane-head">
+          <div>
+            <h2 id="twin-title">Baroon Pocket Dam · Lake Baroon</h2>
+            <p class="meta">Digital twin of the storage that supplies Landers Shute WTP. Terrain is public elevation data; the lake bed, structures and buoy positions are illustrative.</p>
+          </div>
+          <div class="twin-tools">
+            <label class="toggle"><input type="checkbox" id="twin-bloom" checked /> Bloom layer</label>
+            <button class="btn btn-secondary btn-sm" id="twin-reset" type="button">Reset view</button>
+          </div>
+        </div>
+        <div class="pane-body twin-body">
+          <div class="twin-hud" id="twin-hud" aria-live="polite"></div>
+          <div class="twin-stage">
+            <canvas id="twin-canvas" role="img" aria-label="3D view of Lake Baroon and Baroon Pocket Dam. Drag to rotate, scroll to zoom."></canvas>
+            <div class="twin-labels" id="twin-labels"></div>
+            <div class="twin-legend" aria-label="Bloom layer legend">
+              <span class="legend-title">Surface cyanobacteria (cells/mL)</span>
+              <span class="legend-bar"></span>
+              <span class="legend-ticks"><span>2k · Alert 1</span><span>15k</span><span>50k</span><span>100k+</span></span>
+            </div>
+            <div class="twin-loading"><img src="/cc-assets/img/hero-cutaway.webp" alt="" /><p>Loading the Lake Baroon twin</p></div>
+            <div class="twin-fallback" hidden>
+              <img src="/cc-assets/twin/baroon-drape.webp" alt="Map of Lake Baroon" />
+              <p>3D needs WebGL, which this browser doesn't provide. The depth profile and buoy readings below still work.</p>
+            </div>
+          </div>
+          <div class="twin-timeline">
+            <button class="btn btn-secondary btn-sm" id="twin-play" type="button">Replay 14 days</button>
+            <input type="range" id="twin-slider" min="0" max="13" value="13" aria-label="Day to show" />
+            <output id="twin-day" for="twin-slider"></output>
+          </div>
+          <section class="twin-card twin-profile" aria-labelledby="profile-title">
+            <div>
+              <h3 id="profile-title">Depth profile · central basin</h3>
+              <p class="meta">The lake is stratified: algae sit near the surface and the deep water has lost its oxygen. The intake can draw from three depths.</p>
+              <div id="twin-profile-chart"></div>
+            </div>
+            <div id="twin-offtakes"></div>
+          </section>
+          <section class="twin-card" id="twin-buoy" aria-label="Selected buoy"></section>
+        </div>
+      </section>
+
+      <section class="pane pane-agent" aria-labelledby="agent-title">
+        <div class="pane-head">
+          <div>
+            <h2 id="agent-title">Operations Agent</h2>
+            <p class="meta">Investigates across the Water Grid. Anything that changes the business waits for your approval.</p>
+          </div>
+          <button class="btn btn-secondary" id="new-chat" type="button">Start new conversation</button>
+        </div>
+        <div class="pane-body chat-log" id="chat-log" aria-live="polite"></div>
+        <form class="composer" id="composer">
+          <label for="prompt" class="sr-only">Message the Operations Agent</label>
+          <textarea id="prompt" rows="2" placeholder="Ask the Operations Agent, for example: why is Landers Shute flagged?"></textarea>
+          <button class="btn btn-primary" id="send" type="submit">Ask</button>
+        </form>
+        <p class="fineprint">Answers come from governed Unity Catalog data and can still be wrong. Check the evidence.</p>
+      </section>
+    </main>
+
+    <dialog class="drawer" id="brief-dialog" aria-labelledby="brief-title">
+      <img class="drawer-hero" src="/cc-assets/img/hero-cutaway.webp" alt="Illustration: a stratified reservoir with an algal bloom near the surface, an intake tower with three offtake levels, and the dam wall" />
+      <div class="drawer-head">
+        <div>
+          <p class="meta" id="brief-meta"></p>
+          <h2 id="brief-title">Morning operations briefing</h2>
+        </div>
+        <button class="btn-icon" id="close-brief" type="button" aria-label="Close briefing">
+          <svg class="icon" aria-hidden="true"><use href="#i-x"></use></svg>
+        </button>
+      </div>
+      <article class="md drawer-body" id="brief-body"></article>
+    </dialog>
+
+    <div class="toast" id="toast" role="status" hidden></div>
+
+    <!-- Lucide icons (ISC licence), inlined so the app has no external dependencies -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true">
+      <defs>
+        <symbol id="i-critical" viewBox="0 0 24 24"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
+        <symbol id="i-high" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+        <symbol id="i-medium" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
+        <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+        <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+        <symbol id="i-loader" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></symbol>
+        <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+        <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+        <symbol id="i-file" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M16 13H8"/><path d="M16 17H8"/></symbol>
+        <symbol id="i-pause" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M10 15V9"/><path d="M14 15V9"/></symbol>
+        <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
+      </defs>
+    </svg>
+
+    <script src="/ui-assets/markdown-it-15.0.2.min.js"></script>
+    <script src="/cc-assets/cc.js?v=10"></script>
+  </body>
+</html>

@@ -1,0 +1,36 @@
+resources:
+  jobs:
+    seqwater_daily_refresh:
+      name: "Seqwater AI demo - daily refresh and proactive insights"
+      description: >-
+        Regenerates the synthetic Seqwater operating data up to yesterday, rebuilds the governed
+        metric views, then runs the proactive insights engine and writes the executive morning briefing.
+      tags:
+        demo: seqwater-ai-demo
+      schedule:
+        quartz_cron_expression: "0 15 5 * * ?"
+        timezone_id: Australia/Brisbane
+        pause_status: ${var.refresh_schedule_status}
+      max_concurrent_runs: 1
+      environments:
+        - environment_key: serverless
+          spec:
+            environment_version: "4"
+      tasks:
+        - task_key: build_foundation
+          environment_key: serverless
+          spark_python_task:
+            python_file: ../src/build_foundation.py
+            parameters: ["--catalog", "${var.catalog}", "--schema", "${var.schema}"]
+        - task_key: metric_views
+          depends_on: [{task_key: build_foundation}]
+          environment_key: serverless
+          spark_python_task:
+            python_file: ../src/metric_views.py
+            parameters: ["--catalog", "${var.catalog}", "--schema", "${var.schema}"]
+        - task_key: proactive_insights
+          depends_on: [{task_key: metric_views}]
+          environment_key: serverless
+          spark_python_task:
+            python_file: ../src/proactive_insights.py
+            parameters: ["--catalog", "${var.catalog}", "--schema", "${var.schema}", "--llm-endpoint", "${var.llm_endpoint}"]

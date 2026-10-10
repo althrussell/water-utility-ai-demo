@@ -1,0 +1,29 @@
+# Seqwater AI demo - 2. Genie experience
+# The Genie space (Genie One answers from it) and a SQL alert on critical proactive insights.
+# Needs the data platform bundle deployed and run first (tables must exist).
+# The repo CLI renders .build/seqwater_ops.geniespace.json and deploys this for you.
+bundle:
+  name: seqwater-ai-demo-experience
+
+include:
+  - resources/*.yml
+
+variables:
+  catalog:
+    description: Catalog holding the demo schema.
+    default: main
+  schema:
+    description: Demo schema.
+    default: seqwater_demo
+  warehouse_id:
+    description: SQL warehouse Genie and the alert run on.
+  alert_email:
+    description: Who receives the critical insight alert email.
+    default: ${workspace.current_user.userName}
+
+targets:
+  demo:
+    default: true
+    mode: production
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}

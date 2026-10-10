@@ -1,0 +1,19 @@
+# local state and rendered builds (workspace specific - never commit)
+.build/
+.demo-state.*.json
+**/.databricks/
+genie_experience/.build/
+.venv/
+**/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+# agent local dev artefacts
+ops_agent/.env
+ops_agent/app.agentbricksdev.yaml
+ops_agent/.agentbricks/mlartifacts/
+ops_agent/.agentbricks/mlflow*
+# rendered runbook build files
+docs/.build/
+ops_agent/uv.lock

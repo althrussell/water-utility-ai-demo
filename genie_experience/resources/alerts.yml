@@ -1,0 +1,30 @@
+resources:
+  alerts:
+    seqwater_critical_insight:
+      display_name: Seqwater - critical operational insight raised
+      warehouse_id: ${var.warehouse_id}
+      query_text: |-
+        SELECT COUNT(*) AS critical_insights,
+               concat_ws(' | ', collect_list(headline)) AS headlines
+        FROM ${var.catalog}.${var.schema}.proactive_insights
+        WHERE severity = 'Critical'
+          AND insight_date = (SELECT MAX(insight_date) FROM ${var.catalog}.${var.schema}.proactive_insights)
+      custom_summary: "Seqwater: {{ALERT_STATUS}} - critical operational insight(s) raised this morning"
+      custom_description: |-
+        The proactive insights engine raised critical item(s) this morning.
+        Open Genie One and ask "Give me this morning's operations briefing", or open the Seqwater Ops Command Centre.
+      evaluation:
+        source:
+          name: critical_insights
+        comparison_operator: GREATER_THAN
+        threshold:
+          value:
+            double_value: 0
+        empty_result_state: OK
+        notification:
+          notify_on_ok: false
+          subscriptions:
+            - user_email: ${var.alert_email}
+      schedule:
+        quartz_cron_schedule: "0 30 5 * * ?"
+        timezone_id: Australia/Brisbane

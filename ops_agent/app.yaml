@@ -1,0 +1,11 @@
+command: ["uv", "run", "start-server"]
+# Databricks Apps listen on port 8000 by default.
+# Template: the repo CLI (./seqwater-demo install) renders a copy into .build/ with the target
+# workspace's values, and `agentbricks deploy` then adds its runtime settings to that copy.
+env:
+  - name: SEQWATER_CATALOG
+    value: "main"
+  - name: SEQWATER_SCHEMA
+    value: "seqwater_demo"
+  - name: SEQWATER_WAREHOUSE_ID
+    value: "__WAREHOUSE_ID__"

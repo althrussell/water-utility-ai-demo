@@ -1,0 +1,10 @@
+resources:
+  genie_spaces:
+    seqwater_ops:
+      title: Seqwater Operations Intelligence
+      description: >-
+        Ask anything about Seqwater's water grid: storage and water security, water quality and algal risk,
+        treatment performance, retailer demand, energy cost, asset health and maintenance, incidents and the
+        capital program - plus the proactive insights raised each morning. SYNTHETIC demo data.
+      warehouse_id: ${var.warehouse_id}
+      file_path: ../.build/seqwater_ops.geniespace.json
